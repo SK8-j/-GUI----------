@@ -1,10 +1,15 @@
 import sys
 import os
 import shutil
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QLineEdit, QPushButton, QFileDialog, QAbstractItemView, QMenu, QAction
+import platform
+import subprocess
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget,\
+                            QVBoxLayout, QTableWidget, QTableWidgetItem, \
+                            QLineEdit, QPushButton, QFileDialog, \
+                            QAbstractItemView, QMenu, QAction, QToolTip
 from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QColor
-
+from PyQt5.QtGui import QCursor
 
 class FolderSizeTool(QMainWindow):
     def __init__(self):
@@ -19,6 +24,7 @@ class FolderSizeTool(QMainWindow):
 
         # UI布局
         self.init_ui()
+
 
     def init_ui(self):
         # 主窗口的中央小部件
@@ -36,7 +42,7 @@ class FolderSizeTool(QMainWindow):
         self.setAcceptDrops(True)
 
         # 排序按钮
-        self.sort_button = QPushButton("重新排序", self)
+        self.sort_button = QPushButton("从大到小排序", self)
         self.sort_button.setStyleSheet("QPushButton {border-radius: 10px; background-color: #4CAF50; color: white; padding: 10px 20px;} QPushButton:hover {background-color: #45a049;}")
         self.sort_button.clicked.connect(self.sort_folders)
         layout.addWidget(self.sort_button)
@@ -48,11 +54,58 @@ class FolderSizeTool(QMainWindow):
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(0)  # 文件夹列自适应
         self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)  # 表头点击事件
+        self.table.cellDoubleClicked.connect(self.open_folder)  # 连接双击事件
+        self.table.cellEntered.connect(self.on_cell_hovered)  # 连接悬浮事件
         layout.addWidget(self.table)
 
         # 右键菜单
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
+
+    def on_cell_hovered(self, row, column):
+        """鼠标悬浮事件处理"""
+        # 恢复上一个悬浮单元格的背景颜色
+        for r in range(self.table.rowCount()):
+            for c in range(self.table.columnCount()):
+                if r != row or c != column:
+                    self.table.item(r, c).setBackground(QColor(255, 255, 255))  # 恢复为白色背景
+
+        # 设置当前悬浮单元格的背景颜色
+        self.table.item(row, column).setBackground(QColor(220, 220, 220))  # 设置为浅灰色背景
+
+        # 获取当前悬浮单元格的信息
+        folder_name = self.table.item(row, 0).text()  # 获取文件夹名称
+        folder_size = self.table.item(row, 1).text()  # 获取文件大小
+        QToolTip.showText(QCursor.pos(), f"文件夹: {folder_name}\n大小: {folder_size} MB")
+
+    def leaveEvent(self, event):
+        """鼠标离开事件，恢复所有单元格的背景颜色"""
+        for r in range(self.table.rowCount()):
+            for c in range(self.table.columnCount()):
+                self.table.item(r, c).setBackground(QColor(255, 255, 255))  # 恢复为白色背景
+        super().leaveEvent(event)
+
+
+    def open_folder(self, row, column):
+        """双击打开文件夹"""
+        folder_name = self.table.item(row, 0).text()  # 获取文件夹名称
+        folder_path = os.path.join(self.folder_path, folder_name)
+        folder_path = os.path.normpath(folder_path)  # 规范化路径分隔符
+        # print("Opening folder:", folder_path)  # 打印路径以检查是否正确
+
+        if os.path.exists(folder_path):
+            # 根据操作系统选择适当的命令
+            if platform.system() == "Windows":
+                # Windows下调用explorer
+                subprocess.Popen(['explorer', folder_path])
+            elif platform.system() == "Darwin":
+                # macOS下调用open
+                subprocess.Popen(['open', folder_path])
+            else:
+                # Linux下调用xdg-open
+                subprocess.Popen(['xdg-open', folder_path])
+        else:
+            print("Folder path does not exist:", folder_path)
 
     def handle_header_click(self, index):
         """处理表头点击事件"""
@@ -124,7 +177,7 @@ class FolderSizeTool(QMainWindow):
 
     def sort_folders(self):
         """按文件夹大小排序"""
-        self.folder_data.sort(key=lambda x: x[1])
+        self.folder_data.sort(key=lambda x: x[1], reverse=True)
         self.display_folder_data()
 
     def show_context_menu(self, pos):
