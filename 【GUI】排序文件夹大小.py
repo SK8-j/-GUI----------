@@ -20,7 +20,11 @@ class FolderSizeTool(QMainWindow):
 
         self.folder_path = ""
         self.folder_data = []  # 存储文件夹及其大小数据
-        self.sort_order = Qt.AscendingOrder  # 初始排序为升序
+
+        self.sort_order = Qt.DescendingOrder  # 排序顺序，默认为降序
+
+        self.current_hovered_row = -1
+        self.current_hovered_column = -1
 
         # UI布局
         self.init_ui()
@@ -55,35 +59,42 @@ class FolderSizeTool(QMainWindow):
         self.table.horizontalHeader().setSectionResizeMode(0)  # 文件夹列自适应
         self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)  # 表头点击事件
         self.table.cellDoubleClicked.connect(self.open_folder)  # 连接双击事件
-        self.table.cellEntered.connect(self.on_cell_hovered)  # 连接悬浮事件
         layout.addWidget(self.table)
 
         # 右键菜单
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
 
-    def on_cell_hovered(self, row, column):
-        """鼠标悬浮事件处理"""
-        # 恢复上一个悬浮单元格的背景颜色
-        for r in range(self.table.rowCount()):
-            for c in range(self.table.columnCount()):
-                if r != row or c != column:
-                    self.table.item(r, c).setBackground(QColor(255, 255, 255))  # 恢复为白色背景
+    def mouseMoveEvent(self, event):
+        """处理鼠标移动事件"""
+        row = self.table.rowAt(event.y())
+        column = self.table.columnAt(event.x())
 
-        # 设置当前悬浮单元格的背景颜色
-        self.table.item(row, column).setBackground(QColor(220, 220, 220))  # 设置为浅灰色背景
+        if row != -1 and column != -1:
+            # 鼠标进入新的单元格
+            if (row != self.current_hovered_row) or (column != self.current_hovered_column):
+                # 恢复之前悬浮单元格的背景颜色
+                if self.current_hovered_row != -1 and self.current_hovered_column != -1:
+                    self.table.item(self.current_hovered_row, self.current_hovered_column).setBackground(QColor(255, 255, 255))  # 恢复为白色背景
 
-        # 获取当前悬浮单元格的信息
-        folder_name = self.table.item(row, 0).text()  # 获取文件夹名称
-        folder_size = self.table.item(row, 1).text()  # 获取文件大小
-        QToolTip.showText(QCursor.pos(), f"文件夹: {folder_name}\n大小: {folder_size} MB")
+                # 设置新的悬浮单元格的背景颜色
+                self.table.item(row, column).setBackground(QColor(220, 220, 220))  # 设置为浅灰色背景
 
-    def leaveEvent(self, event):
-        """鼠标离开事件，恢复所有单元格的背景颜色"""
-        for r in range(self.table.rowCount()):
-            for c in range(self.table.columnCount()):
-                self.table.item(r, c).setBackground(QColor(255, 255, 255))  # 恢复为白色背景
-        super().leaveEvent(event)
+                # 更新当前悬浮的单元格
+                self.current_hovered_row = row
+                self.current_hovered_column = column
+
+                # 显示工具提示
+                folder_name = self.table.item(row, 0).text()  # 获取文件夹名称
+                folder_size = self.table.item(row, 1).text()  # 获取文件大小
+                QToolTip.showText(QCursor.pos(), f"文件夹: {folder_name}\n大小: {folder_size} MB")
+        else:
+            # 鼠标离开表格区域，恢复背景颜色
+            if self.current_hovered_row != -1 and self.current_hovered_column != -1:
+                self.table.item(self.current_hovered_row, self.current_hovered_column).setBackground(QColor(255, 255, 255))  # 恢复为白色背景
+                self.current_hovered_row = -1
+                self.current_hovered_column = -1
+                QToolTip.hideText()
 
 
     def open_folder(self, row, column):
