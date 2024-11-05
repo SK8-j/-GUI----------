@@ -15,6 +15,7 @@ class FolderSizeTool(QMainWindow):
 
         self.folder_path = ""
         self.folder_data = []  # 存储文件夹及其大小数据
+        self.sort_order = Qt.AscendingOrder  # 初始排序为升序
 
         # UI布局
         self.init_ui()
@@ -46,11 +47,27 @@ class FolderSizeTool(QMainWindow):
         self.table.setHorizontalHeaderLabels(["文件夹/文件名", "大小 (MB)"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(0)  # 文件夹列自适应
+        self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)  # 表头点击事件
         layout.addWidget(self.table)
 
         # 右键菜单
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
+
+    def handle_header_click(self, index):
+        """处理表头点击事件"""
+        if index == 0:
+            # 按文件夹/文件名排序
+            self.folder_data.sort(key=lambda x: x[0], reverse=self.sort_order == Qt.DescendingOrder)
+        elif index == 1:
+            # 按大小排序
+            self.folder_data.sort(key=lambda x: x[1], reverse=self.sort_order == Qt.DescendingOrder)
+
+        # 切换排序顺序
+        self.sort_order = Qt.DescendingOrder if self.sort_order == Qt.AscendingOrder else Qt.AscendingOrder
+
+        # 更新表格显示
+        self.display_folder_data()
 
     def dragEnterEvent(self, event):
         """处理拖拽进入事件"""
