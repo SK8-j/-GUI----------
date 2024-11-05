@@ -1,123 +1,119 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QLineEdit, QPushButton, QFileDialog, QAbstractItemView, QMenu, QAction, QHBoxLayout, QComboBox
+import shutil
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QLineEdit, QPushButton, QFileDialog, QAbstractItemView, QMenu, QAction
 from PyQt5.QtCore import Qt, QUrl
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QDragEnterEvent, QDropEvent
 
 class FolderSizeTool(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Folder Size Tool")
+        self.setWindowTitle("文件夹大小排序工具")
         self.setGeometry(100, 100, 800, 600)
-        self.setAcceptDrops(True)
 
-        self.layout = QVBoxLayout()
+        self.folder_path = ""
+        self.folder_data = []  # 存储文件夹及其大小数据
 
-        # 输入框和按钮
+        # UI布局
+        self.init_ui()
+
+    def init_ui(self):
+        # 创建布局
+        layout = QVBoxLayout()
+
+        # 输入路径的文本框
         self.path_input = QLineEdit(self)
-        self.path_input.setPlaceholderText("Drag and drop a folder here or paste a path")
-        self.path_input.setStyleSheet("padding: 10px; border-radius: 5px; border: 1px solid #ccc;")
-        self.path_input.setFixedHeight(40)
-        self.layout.addWidget(self.path_input)
+        self.path_input.setPlaceholderText("拖拽文件夹或输入路径")
+        layout.addWidget(self.path_input)
+
+        # 创建显示排序结果的表格
+        self.table_widget = QTableWidget(self)
+        self.table_widget.setColumnCount(2)
+        self.table_widget.setHorizontalHeaderLabels(["文件夹/文件名", "大小 (字节)"])
+
+        self.table_widget.setEditTriggers(QAbstractItemView.NoEditTriggers)  # 禁止编辑
+        self.table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)  # 行选择
+        self.table_widget.setSelectionMode(QAbstractItemView.SingleSelection)  # 单选模式
 
         # 按钮
-        self.button = QPushButton("Start Sorting", self)
-        self.button.setStyleSheet("border-radius: 10px; background-color: #4CAF50; color: white; padding: 10px;")
-        self.button.clicked.connect(self.process_path)
-        self.layout.addWidget(self.button)
+        self.sort_button = QPushButton("排序", self)
+        self.sort_button.setStyleSheet("border-radius: 10px; background-color: #4CAF50; color: white; font-size: 16px; padding: 10px;")
+        self.sort_button.clicked.connect(self.sort_data)
+        layout.addWidget(self.sort_button)
 
-        # 表格
-        self.table = QTableWidget(self)
-        self.table.setColumnCount(2)  # 2列：名称和大小
-        self.table.setHorizontalHeaderLabels(["Name", "Size (bytes)"])
-        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setStyleSheet("""
-            QTableWidget {
-                border: none;
-                font-size: 14px;
-            }
-            QHeaderView::section {
-                background-color: #f2f2f2;
-                padding: 5px;
-                font-weight: bold;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                border: none;
-            }
-        """)
-        self.layout.addWidget(self.table)
+        # 将表格添加到布局
+        layout.addWidget(self.table_widget)
 
-        # 排序筛选器
-        self.filter_layout = QHBoxLayout()
-
-        self.sort_by_combo = QComboBox(self)
-        self.sort_by_combo.addItem("Sort by Name")
-        self.sort_by_combo.addItem("Sort by Size")
-        self.sort_by_combo.currentIndexChanged.connect(self.sort_table)
-        self.filter_layout.addWidget(self.sort_by_combo)
-
-        self.order_combo = QComboBox(self)
-        self.order_combo.addItem("Ascending")
-        self.order_combo.addItem("Descending")
-        self.order_combo.currentIndexChanged.connect(self.sort_table)
-        self.filter_layout.addWidget(self.order_combo)
-
-        self.layout.addLayout(self.filter_layout)
-
-        # 主界面设置
+        # 设置窗口的中央小部件
         container = QWidget()
-        container.setLayout(self.layout)
+        container.setLayout(layout)
         self.setCentralWidget(container)
 
-    def process_path(self):
-        path = self.path_input.text().strip()
-        if os.path.exists(path):
-            self.clear_table()
-            self.load_directory(path)
+        # 支持拖拽
+        self.setAcceptDrops(True)
 
-    def load_directory(self, path):
-        # 获取路径下的所有文件夹和文件
-        items = [(name, os.path.getsize(os.path.join(path, name))) for name in os.listdir(path) if os.path.isdir(os.path.join(path, name)) or os.path.isfile(os.path.join(path, name))]
-        
-        # 更新表格
-        self.table.setRowCount(len(items))
-        for row, (name, size) in enumerate(items):
-            self.table.setItem(row, 0, QTableWidgetItem(name))
-            self.table.setItem(row, 1, QTableWidgetItem(str(size)))
-
-        self.sort_table()  # 默认按选择的排序规则进行排序
-
-    def sort_table(self):
-        sort_by = self.sort_by_combo.currentText()  # 按名称还是按大小排序
-        order = self.order_combo.currentText()  # 升序或降序
-        
-        column = 0 if sort_by == "Sort by Name" else 1  # 根据选择的排序类型确定列
-        order_flag = Qt.AscendingOrder if order == "Ascending" else Qt.DescendingOrder
-        
-        # 排序
-        self.table.sortItems(column, order_flag)
-
-    def clear_table(self):
-        self.table.setRowCount(0)  # 清空表格
-
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
             event.accept()
         else:
             event.ignore()
 
-    def dropEvent(self, event):
-        urls = event.mimeData().urls()
-        if urls:
-            folder_path = urls[0].toLocalFile()
-            self.path_input.setText(folder_path)
-            self.process_path()
+    def dropEvent(self, event: QDropEvent):
+        # 获取拖拽的路径
+        url = event.mimeData().urls()[0].toLocalFile()
+        if os.path.isdir(url):
+            self.folder_path = url
+            self.path_input.setText(url)
+            self.clear_and_sort_data(url)
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = FolderSizeTool()
-    window.show()
-    sys.exit(app.exec_())
+    def clear_and_sort_data(self, path):
+        self.folder_data.clear()
+        self.populate_data(path)
+        self.update_table()
+
+    def populate_data(self, path):
+        # 获取该路径下所有文件夹和文件，并计算大小
+        for item in os.listdir(path):
+            item_path = os.path.join(path, item)
+            if os.path.isdir(item_path):
+                size = self.get_folder_size(item_path)
+            else:
+                size = os.path.getsize(item_path)
+            self.folder_data.append((item, size))
+
+    def get_folder_size(self, folder_path):
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(folder_path):
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+                total_size += os.path.getsize(file_path)
+        return total_size
+
+    def update_table(self):
+        # 更新表格内容
+        self.table_widget.setRowCount(len(self.folder_data))
+        for row, (name, size) in enumerate(self.folder_data):
+            self.table_widget.setItem(row, 0, QTableWidgetItem(name))
+            self.table_widget.setItem(row, 1, QTableWidgetItem(str(size)))
+
+    def sort_data(self):
+        # 排序并更新表格
+        if not self.folder_data:
+            return
+        self.folder_data.sort(key=lambda x: x[1], reverse=True)
+        self.update_table()
+
+    def header_clicked(self, index):
+        # 点击表头时，按列进行排序
+        if index == 0:  # 按名称排序
+            self.folder_data.sort(key=lambda x: x[0], reverse=False)
+        elif index == 1:  # 按大小排序
+            self.folder_data.sort(key=lambda x: x[1], reverse=False)
+        self.update_table()
+
+
+app = QApplication(sys.argv)
+window = FolderSizeTool()
+window.show()
+sys.exit(app.exec_())
