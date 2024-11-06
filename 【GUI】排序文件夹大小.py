@@ -6,23 +6,22 @@ import subprocess
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget,\
                             QVBoxLayout, QTableWidget, QTableWidgetItem, \
                             QLineEdit, QPushButton, QFileDialog, \
-                            QAbstractItemView, QMenu, QAction, QToolTip
-from PyQt5.QtCore import Qt, QUrl
+                            QAbstractItemView, QMenu, QAction, QToolTip,\
+                            QHeaderView
+from PyQt5.QtCore import Qt, QUrl,pyqtSlot
 from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QColor
-from PyQt5.QtGui import QCursor
 
 class FolderSizeTool(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("文件夹大小排序工具")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 500, 600)
 
         self.folder_path = ""
         self.folder_data = []  # 存储文件夹及其大小数据
 
         self.sort_order = Qt.DescendingOrder  # 排序顺序，默认为降序
-
         self.current_hovered_row = -1
         self.current_hovered_column = -1
 
@@ -42,6 +41,13 @@ class FolderSizeTool(QMainWindow):
         self.path_input.setPlaceholderText("拖拽或输入路径")
         layout.addWidget(self.path_input)
 
+        # 执行按钮
+        self.path_input.returnPressed.connect(self.confirm_path)  # Enter key event
+        self.confirm_button = QPushButton("确认", self)
+        self.confirm_button.setStyleSheet("QPushButton {border-radius: 6px; background-color: #4CAF50; color: white; padding: 10px 20px;} QPushButton:hover {background-color: #45a049;}")
+        self.confirm_button.clicked.connect(self.confirm_path)  # Confirmation button
+        layout.addWidget(self.confirm_button)
+
         # 拖拽区
         self.setAcceptDrops(True)
 
@@ -56,46 +62,47 @@ class FolderSizeTool(QMainWindow):
         self.table.setColumnCount(2)  # 两列: 文件夹/文件名 和 大小
         self.table.setHorizontalHeaderLabels(["文件夹/文件名", "大小 (MB)"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table.horizontalHeader().setSectionResizeMode(0)  # 文件夹列自适应
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)  # 自适应第一列
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table.setMouseTracking(True)  # 启用鼠标跟踪
         self.table.horizontalHeader().sectionClicked.connect(self.handle_header_click)  # 表头点击事件
         self.table.cellDoubleClicked.connect(self.open_folder)  # 连接双击事件
+        self.table.itemEntered.connect(self.on_item_hover)  # 连接鼠标进入单元格事件
         layout.addWidget(self.table)
 
         # 右键菜单
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
 
-    def mouseMoveEvent(self, event):
-        """处理鼠标移动事件"""
-        row = self.table.rowAt(event.y())
-        column = self.table.columnAt(event.x())
 
-        if row != -1 and column != -1:
-            # 鼠标进入新的单元格
-            if (row != self.current_hovered_row) or (column != self.current_hovered_column):
-                # 恢复之前悬浮单元格的背景颜色
-                if self.current_hovered_row != -1 and self.current_hovered_column != -1:
-                    self.table.item(self.current_hovered_row, self.current_hovered_column).setBackground(QColor(255, 255, 255))  # 恢复为白色背景
+    @pyqtSlot(QTableWidgetItem)
+    def on_item_hover(self, item):
+        """当鼠标悬停在单元格上时调用"""
+        # 恢复所有单元格为默认颜色
+        for row in range(self.table.rowCount()):
+            for column in range(self.table.columnCount()):
+                self.table.item(row, column).setBackground(QColor(255, 255, 255))  # 设置默认白色背景
 
-                # 设置新的悬浮单元格的背景颜色
-                self.table.item(row, column).setBackground(QColor(220, 220, 220))  # 设置为浅灰色背景
+        # 设置鼠标悬停单元格的背景颜色变化
+        if item:
+            # Reset the background color of the previous hovered cell
+            if hasattr(self, 'previous_hovered_item') and self.previous_hovered_item:
+                self.previous_hovered_item.setBackground(QColor(255, 255, 255))
 
-                # 更新当前悬浮的单元格
-                self.current_hovered_row = row
-                self.current_hovered_column = column
+            # Set the background color of the currently hovered cell
+            hover_color = QColor(135, 206, 235, 150)  # Define color (sky blue with transparency)
+            item.setBackground(hover_color)
 
-                # 显示工具提示
-                folder_name = self.table.item(row, 0).text()  # 获取文件夹名称
-                folder_size = self.table.item(row, 1).text()  # 获取文件大小
-                QToolTip.showText(QCursor.pos(), f"文件夹: {folder_name}\n大小: {folder_size} MB")
-        else:
-            # 鼠标离开表格区域，恢复背景颜色
-            if self.current_hovered_row != -1 and self.current_hovered_column != -1:
-                self.table.item(self.current_hovered_row, self.current_hovered_column).setBackground(QColor(255, 255, 255))  # 恢复为白色背景
-                self.current_hovered_row = -1
-                self.current_hovered_column = -1
-                QToolTip.hideText()
+            # Remember this item for future reference
+            self.previous_hovered_item = item
 
+        # Add a new method for path confirmation and sorting
+    def confirm_path(self):
+        """Confirm path and load data, then sort."""
+        folder_path = self.path_input.text().strip()
+        if folder_path:
+            self.load_folder_data(folder_path)  # Load folder data
+            self.sort_folders()
 
     def open_folder(self, row, column):
         """双击打开文件夹"""
@@ -183,8 +190,19 @@ class FolderSizeTool(QMainWindow):
         """将文件夹数据展示在表格中"""
         self.table.setRowCount(len(self.folder_data))
         for i, (name, size) in enumerate(self.folder_data):
-            self.table.setItem(i, 0, QTableWidgetItem(name))
-            self.table.setItem(i, 1, QTableWidgetItem(f"{size:.2f}"))
+            name_item = QTableWidgetItem(name)
+            size_item = QTableWidgetItem(f"{size:.2f}")
+            
+            # 设置单元格项的属性
+            name_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            size_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            
+            self.table.setItem(i, 0, name_item)
+            self.table.setItem(i, 1, size_item)
+
+        # 设置单元格默认宽度
+        self.table.setColumnWidth(0, 300)  # 设置文件夹/文件名列宽度
+        self.table.setColumnWidth(1, 100)  # 设置大小列宽度
 
     def sort_folders(self):
         """按文件夹大小排序"""
