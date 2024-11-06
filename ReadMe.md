@@ -15,19 +15,15 @@
 
 1. 安装所需库：
    
-   bash
-   
-   复制代码
-   
-   `pip install PyQt5`
+   ```bash
+   pip install PyQt5
+   ```
 
 2. 下载代码并运行：
    
-   bash
-   
-   复制代码
-   
-   `python 【GUI】排序文件夹大小.py`
+   ```bash
+   python 【GUI】排序文件夹大小.py
+   ```
 
 ## 使用说明
 
@@ -63,19 +59,15 @@ This is a graphical tool built with Python and PyQt5 to view and sort the size o
 
 1. Install required libraries:
    
-   bash
-   
-   复制代码
-   
-   `pip install PyQt5`
+   ```bash
+   pip install PyQt5
+   ```
 
 2. Download the code and run:
    
-   bash
-   
-   复制代码
-   
-   `python 【GUI】排序文件夹大小.py`
+   ```bash
+   python 【GUI】排序文件夹大小.py
+   ```
 
 ## Usage Instructions
 
