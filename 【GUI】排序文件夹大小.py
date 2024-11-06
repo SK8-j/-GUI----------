@@ -81,13 +81,19 @@ class FolderSizeTool(QMainWindow):
         # 恢复所有单元格为默认颜色
         for row in range(self.table.rowCount()):
             for column in range(self.table.columnCount()):
-                self.table.item(row, column).setBackground(QColor(255, 255, 255))  # 设置默认白色背景
+                cell_item = self.table.item(row, column)
+                if cell_item:  # 确保单元格项存在
+                    cell_item.setBackground(QColor(255, 255, 255))  # 设置默认白色背景
 
         # 设置鼠标悬停单元格的背景颜色变化
         if item:
             # Reset the background color of the previous hovered cell
-            if hasattr(self, 'previous_hovered_item') and self.previous_hovered_item:
-                self.previous_hovered_item.setBackground(QColor(255, 255, 255))
+            if hasattr(self, 'previous_hovered_item') and self.previous_hovered_item is not None:
+                try:
+                    self.previous_hovered_item.setBackground(QColor(255, 255, 255))
+                except RuntimeError:
+                    # If the item was deleted, ignore this error
+                    pass
 
             # Set the background color of the currently hovered cell
             hover_color = QColor(135, 206, 235, 150)  # Define color (sky blue with transparency)
@@ -95,8 +101,12 @@ class FolderSizeTool(QMainWindow):
 
             # Remember this item for future reference
             self.previous_hovered_item = item
+        else:
+            # 如果没有悬停的单元格，重置 previous_hovered_item
+            if hasattr(self, 'previous_hovered_item'):
+                del self.previous_hovered_item
 
-        # Add a new method for path confirmation and sorting
+    # Add a new method for path confirmation and sorting
     def confirm_path(self):
         """Confirm path and load data, then sort."""
         folder_path = self.path_input.text().strip()
